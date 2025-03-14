@@ -25,7 +25,7 @@ interface Selection {
 const GAME_TIME = 60;
 
 const GameCanvas: React.FC<{
-  onGameFinish: (score: number, timeLeft: number) => void;
+  onGameFinish: (finalScore: number, score: number, timeLeft: number) => void;
 }> = ({ onGameFinish }) => {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const [gameStarted, setGameStarted] = useState<boolean>(false);
@@ -52,7 +52,16 @@ const GameCanvas: React.FC<{
     generateGrid();
   }, []);
 
-  // Game timer
+  // 점수 계산 함수 추가
+  const calculateFinalScore = (
+    matchCount: number,
+    remainingTime: number
+  ): number => {
+    const safeTime = Math.max(0, remainingTime); // 시간이 음수가 되지 않도록 보장
+    return matchCount + safeTime;
+  };
+
+  // Game timer도 같은 방식으로 수정
   useEffect(() => {
     if (!gameStarted || gameOver) return;
 
@@ -60,7 +69,12 @@ const GameCanvas: React.FC<{
       setTimeLeft((prev) => {
         if (prev <= 1) {
           clearInterval(timer);
-          endGame();
+          const finalScore = calculateFinalScore(score, 0);
+
+          setGameOver(true);
+          setTimeout(() => {
+            onGameFinish(finalScore, score, Math.max(0, timeLeft));
+          }, 100);
           return 0;
         }
         return prev - 1;
@@ -68,16 +82,26 @@ const GameCanvas: React.FC<{
     }, 1000);
 
     return () => clearInterval(timer);
-  }, [gameStarted, gameOver]);
+  }, [gameStarted, gameOver, score, onGameFinish]);
 
   // Check if all apples are removed
   useEffect(() => {
-    if (apples.length === 0 || apples.some((apple) => !apple.removed)) return;
+    if (apples.length === 0 || !gameStarted || gameOver) return;
 
-    setTimeout(() => {
-      generateGrid();
-    }, 1500);
-  }, [apples]);
+    // 모든 사과가 제거되었는지 확인
+    if (apples.every((apple) => apple.removed)) {
+      const finalScore = calculateFinalScore(score, timeLeft);
+
+      setGameOver(true);
+      setTimeout(() => {
+        onGameFinish(finalScore, score, Math.max(0, timeLeft));
+      }, 100);
+
+      setTimeout(() => {
+        generateGrid();
+      }, 1500);
+    }
+  }, [apples, gameStarted, gameOver, score, timeLeft, onGameFinish]);
 
   const generateGrid = () => {
     const newApples: AppleItem[] = [];
@@ -263,10 +287,12 @@ const GameCanvas: React.FC<{
     setGameStarted(true);
   };
 
-  const endGame = () => {
-    onGameFinish(score, timeLeft);
-    setGameOver(true);
-  };
+  // const endGame = () => {
+  //   const finalScore = score;
+  //   const finalTime = timeLeft;
+  //   setGameOver(true);
+  //   onGameFinish(finalScore, finalTime);
+  // };
 
   const resetGame = () => {
     generateGrid();
@@ -555,7 +581,10 @@ const GameCanvas: React.FC<{
                 <div className="mb-6">
                   <p className="text-lg font-medium mb-2">점수는?</p>
                   <p className="text-4xl font-bold text-apple-red mb-4">
-                    {score}
+                    {calculateFinalScore(score, timeLeft)}
+                  </p>
+                  <p className="text-sm text-gray-600">
+                    (맞춘 개수: {score} + 남은 시간: {Math.max(0, timeLeft)})
                   </p>
                 </div>
               )}
