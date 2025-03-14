@@ -372,7 +372,6 @@ const GameCanvas: React.FC<{
 
     // Check if current selection forms a rectangle
     if (startRow <= endRow && startCol <= endCol) {
-      // Get all apples in the selection
       const selectedApples = apples.filter(
         (apple) =>
           !apple.removed &&
@@ -382,12 +381,9 @@ const GameCanvas: React.FC<{
           apple.position.col <= endCol
       );
 
-      // Calculate sum of selected apples
       const sum = selectedApples.reduce((acc, apple) => acc + apple.value, 0);
 
-      // Check if sum is 10
       if (sum === 10) {
-        // Mark apples as removed
         const newApples = apples.map((apple) => {
           if (selectedApples.some((selected) => selected.id === apple.id)) {
             return { ...apple, removed: true };
@@ -395,7 +391,6 @@ const GameCanvas: React.FC<{
           return apple;
         });
 
-        // Create sparkles
         const newSparkles = selectedApples.map((apple) => ({
           x: apple.position.col * cellSize + gridPadding + cellSize / 2,
           y: apple.position.row * cellSize + gridPadding + cellSize / 2,
@@ -404,7 +399,7 @@ const GameCanvas: React.FC<{
 
         setApples(newApples);
         setSparkles((prev) => [...prev, ...newSparkles]);
-        setScore((prev) => prev + 1);
+        setScore((prev) => prev + selectedApples.length);
       }
     }
 
