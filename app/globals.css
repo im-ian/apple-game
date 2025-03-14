@@ -129,3 +129,10 @@
     @apply bg-background text-foreground;
   }
 }
+
+body {
+  background-image: url("/background.svg");
+  background-size: cover;
+  background-position: bottom center;
+  background-repeat: no-repeat;
+}
