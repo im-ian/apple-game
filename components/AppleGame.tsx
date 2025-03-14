@@ -1,5 +1,4 @@
 import React, { useRef, useEffect, useState } from "react";
-import { toast } from "sonner";
 
 interface Position {
   x: number;
@@ -23,12 +22,16 @@ interface Selection {
   endCol: number;
 }
 
-const GameCanvas: React.FC = () => {
+const GAME_TIME = 60;
+
+const GameCanvas: React.FC<{
+  onGameFinish: (score: number, timeLeft: number) => void;
+}> = ({ onGameFinish }) => {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const [gameStarted, setGameStarted] = useState<boolean>(false);
   const [gameOver, setGameOver] = useState<boolean>(false);
   const [score, setScore] = useState<number>(0);
-  const [timeLeft, setTimeLeft] = useState<number>(30);
+  const [timeLeft, setTimeLeft] = useState<number>(GAME_TIME);
   const [apples, setApples] = useState<AppleItem[]>([]);
   const [isDragging, setIsDragging] = useState<boolean>(false);
   const [dragStart, setDragStart] = useState<Position | null>(null);
@@ -41,7 +44,7 @@ const GameCanvas: React.FC = () => {
   >([]);
 
   const gridSize = 10;
-  const cellSize = 60;
+  const cellSize = 50;
   const gridPadding = 20;
 
   // Initialize game
@@ -71,11 +74,6 @@ const GameCanvas: React.FC = () => {
   useEffect(() => {
     if (apples.length === 0 || apples.some((apple) => !apple.removed)) return;
 
-    // All apples are removed
-    toast.success("Congratulations! All apples removed!", {
-      position: "top-center",
-    });
-
     setTimeout(() => {
       generateGrid();
     }, 1500);
@@ -83,53 +81,50 @@ const GameCanvas: React.FC = () => {
 
   const generateGrid = () => {
     const newApples: AppleItem[] = [];
-    const usedValues = new Set<string>();
+    const grid: (number | null)[][] = Array(gridSize)
+      .fill(null)
+      .map(() => Array(gridSize).fill(null));
 
-    // Ensure all apples can form combinations that sum to 10
-    // First, create pairs that sum to 10
-    const pairs: number[][] = [];
+    // 그리드에 숫자 채우기를 위한 가능한 조합들 준비
+    const combinations: number[][] = [];
+
+    // 2개씩 조합 (합이 10)
     for (let i = 1; i <= 9; i++) {
-      for (let j = 1; j <= 9; j++) {
-        if (i + j === 10) {
-          pairs.push([i, j]);
+      combinations.push([i, 10 - i]);
+    }
+
+    // 3개씩 조합 (합이 10)
+    for (let i = 1; i <= 7; i++) {
+      for (let j = 1; j <= 7; j++) {
+        const k = 10 - i - j;
+        if (k >= 1 && k <= 9 && i !== j && j !== k && i !== k) {
+          combinations.push([i, j, k]);
         }
       }
     }
 
-    // For grid cells that don't fit in pairs, add triples or quads that sum to 10
-    const triples: number[][] = [];
-    for (let i = 1; i <= 9; i++) {
-      for (let j = 1; j <= 9; j++) {
-        for (let k = 1; k <= 9; k++) {
-          if (i + j + k === 10 && i !== j && j !== k && i !== k) {
-            triples.push([i, j, k]);
+    // 4개씩 조합 (합이 10)
+    for (let i = 1; i <= 5; i++) {
+      for (let j = 1; j <= 5; j++) {
+        for (let k = 1; k <= 5; k++) {
+          const l = 10 - i - j - k;
+          if (
+            l >= 1 &&
+            l <= 9 &&
+            i !== j &&
+            j !== k &&
+            k !== l &&
+            i !== k &&
+            i !== l &&
+            j !== l
+          ) {
+            combinations.push([i, j, k, l]);
           }
         }
       }
     }
 
-    const quads: number[][] = [];
-    for (let i = 1; i <= 9; i++) {
-      for (let j = 1; j <= 9; j++) {
-        for (let k = 1; k <= 9; k++) {
-          for (let l = 1; l <= 9; l++) {
-            if (
-              i + j + k + l === 10 &&
-              i !== j &&
-              j !== k &&
-              k !== l &&
-              i !== k &&
-              i !== l &&
-              j !== l
-            ) {
-              quads.push([i, j, k, l]);
-            }
-          }
-        }
-      }
-    }
-
-    // Shuffle all arrays
+    // 조합들을 섞기
     const shuffle = <T,>(array: T[]): T[] => {
       for (let i = array.length - 1; i > 0; i--) {
         const j = Math.floor(Math.random() * (i + 1));
@@ -138,136 +133,139 @@ const GameCanvas: React.FC = () => {
       return array;
     };
 
-    const shuffledPairs = shuffle([...pairs]);
-    const shuffledTriples = shuffle([...triples]);
-    const shuffledQuads = shuffle([...quads]);
+    const shuffledCombinations = shuffle([...combinations]);
 
-    // Fill grid with values
-    let row = 0;
-    let col = 0;
-    let pairIndex = 0;
-    let tripleIndex = 0;
-    let quadIndex = 0;
+    // 무작위 시작 위치에서 그리드 채우기
+    const fillGridRandomly = () => {
+      const emptyCells: [number, number][] = [];
 
-    while (row < gridSize) {
-      // Try to place a pair
-      if (col <= gridSize - 2 && pairIndex < shuffledPairs.length) {
-        const pair = shuffledPairs[pairIndex++];
-        newApples.push({
-          id: `apple-${row}-${col}`,
-          value: pair[0],
-          position: { row, col },
-          removed: false,
-        });
-        newApples.push({
-          id: `apple-${row}-${col + 1}`,
-          value: pair[1],
-          position: { row, col: col + 1 },
-          removed: false,
-        });
-        usedValues.add(`${row}-${col}`);
-        usedValues.add(`${row}-${col + 1}`);
-        col += 2;
+      // 모든 빈 셀 찾기
+      for (let row = 0; row < gridSize; row++) {
+        for (let col = 0; col < gridSize; col++) {
+          if (grid[row][col] === null) {
+            emptyCells.push([row, col]);
+          }
+        }
       }
-      // Try to place a triple
-      else if (col <= gridSize - 3 && tripleIndex < shuffledTriples.length) {
-        const triple = shuffledTriples[tripleIndex++];
-        newApples.push({
-          id: `apple-${row}-${col}`,
-          value: triple[0],
-          position: { row, col },
-          removed: false,
-        });
-        newApples.push({
-          id: `apple-${row}-${col + 1}`,
-          value: triple[1],
-          position: { row, col: col + 1 },
-          removed: false,
-        });
-        newApples.push({
-          id: `apple-${row}-${col + 2}`,
-          value: triple[2],
-          position: { row, col: col + 2 },
-          removed: false,
-        });
-        usedValues.add(`${row}-${col}`);
-        usedValues.add(`${row}-${col + 1}`);
-        usedValues.add(`${row}-${col + 2}`);
-        col += 3;
+
+      if (emptyCells.length === 0) return;
+
+      // 시작 지점 무작위 선택
+      const startIndex = Math.floor(Math.random() * emptyCells.length);
+      const [startRow, startCol] = emptyCells[startIndex];
+
+      // 조합 선택 및 배치 시도
+      for (const combo of shuffledCombinations) {
+        // 조합을 배치할 수 있는 방향 선택 시도
+        const directions = shuffle([
+          [0, 1], // 오른쪽
+          [1, 0], // 아래
+          [1, 1], // 대각선 오른쪽 아래
+          [0, -1], // 왼쪽
+          [-1, 0], // 위
+          [-1, -1], // 대각선 왼쪽 위
+          [1, -1], // 대각선 오른쪽 위
+          [-1, 1], // 대각선 왼쪽 아래
+        ]);
+
+        for (const [dx, dy] of directions) {
+          let canPlace = true;
+          const positions: [number, number][] = [];
+
+          // 현재 조합을 선택한 방향에 배치할 수 있는지 확인
+          for (let i = 0; i < combo.length; i++) {
+            const row = startRow + i * dx;
+            const col = startCol + i * dy;
+
+            if (
+              row < 0 ||
+              row >= gridSize ||
+              col < 0 ||
+              col >= gridSize ||
+              grid[row][col] !== null
+            ) {
+              canPlace = false;
+              break;
+            }
+
+            positions.push([row, col]);
+          }
+
+          if (canPlace) {
+            // 조합 배치
+            for (let i = 0; i < combo.length; i++) {
+              const [row, col] = positions[i];
+              grid[row][col] = combo[i];
+            }
+            return true;
+          }
+        }
       }
-      // Try to place a quad
-      else if (col <= gridSize - 4 && quadIndex < shuffledQuads.length) {
-        const quad = shuffledQuads[quadIndex++];
-        newApples.push({
-          id: `apple-${row}-${col}`,
-          value: quad[0],
-          position: { row, col },
-          removed: false,
-        });
-        newApples.push({
-          id: `apple-${row}-${col + 1}`,
-          value: quad[1],
-          position: { row, col: col + 1 },
-          removed: false,
-        });
-        newApples.push({
-          id: `apple-${row}-${col + 2}`,
-          value: quad[2],
-          position: { row, col: col + 2 },
-          removed: false,
-        });
-        newApples.push({
-          id: `apple-${row}-${col + 3}`,
-          value: quad[3],
-          position: { row, col: col + 3 },
-          removed: false,
-        });
-        usedValues.add(`${row}-${col}`);
-        usedValues.add(`${row}-${col + 1}`);
-        usedValues.add(`${row}-${col + 2}`);
-        usedValues.add(`${row}-${col + 3}`);
-        col += 4;
+
+      // 단일 숫자 배치 (조합 배치 실패 시)
+      grid[startRow][startCol] = Math.floor(Math.random() * 9) + 1;
+      return true;
+    };
+
+    // 그리드 채우기
+    let attemptsCount = 0;
+    const maxAttempts = gridSize * gridSize * 3; // 최대 시도 횟수 설정
+
+    while (attemptsCount < maxAttempts) {
+      const result = fillGridRandomly();
+      if (!result) break;
+
+      // 그리드가 다 채워졌는지 확인
+      let allFilled = true;
+      for (let row = 0; row < gridSize; row++) {
+        for (let col = 0; col < gridSize; col++) {
+          if (grid[row][col] === null) {
+            allFilled = false;
+            break;
+          }
+        }
+        if (!allFilled) break;
       }
-      // Move to next row if needed
-      else {
-        row++;
-        col = 0;
-      }
+
+      if (allFilled) break;
+      attemptsCount++;
     }
 
-    // Fill any remaining cells (shouldn't happen with our logic, but just in case)
-    for (let r = 0; r < gridSize; r++) {
-      for (let c = 0; c < gridSize; c++) {
-        if (!usedValues.has(`${r}-${c}`)) {
-          const randomValue = Math.floor(Math.random() * 9) + 1;
-          newApples.push({
-            id: `apple-${r}-${c}`,
-            value: randomValue,
-            position: { row: r, col: c },
-            removed: false,
-          });
+    // 남은 빈 셀들 무작위 숫자로 채우기
+    for (let row = 0; row < gridSize; row++) {
+      for (let col = 0; col < gridSize; col++) {
+        if (grid[row][col] === null) {
+          // 빈 셀에 1~9 사이의 값 할당
+          grid[row][col] = Math.floor(Math.random() * 9) + 1;
         }
       }
     }
 
+    // 최종 그리드를 apples 배열로 변환
+    for (let row = 0; row < gridSize; row++) {
+      for (let col = 0; col < gridSize; col++) {
+        newApples.push({
+          id: `apple-${row}-${col}`,
+          value: grid[row][col] as number,
+          position: { row, col },
+          removed: false,
+        });
+      }
+    }
+
     setApples(newApples);
-    setTimeLeft(30);
+    setTimeLeft(GAME_TIME);
     setScore(0);
     setGameOver(false);
   };
 
   const startGame = () => {
     setGameStarted(true);
-    toast.success("Game started! Find combinations that sum to 10.", {
-      position: "top-center",
-    });
   };
 
   const endGame = () => {
+    onGameFinish(score, timeLeft);
     setGameOver(true);
-    toast.error("Time's up!", {
-      position: "top-center",
-    });
   };
 
   const resetGame = () => {
@@ -379,15 +377,6 @@ const GameCanvas: React.FC = () => {
         setApples(newApples);
         setSparkles((prev) => [...prev, ...newSparkles]);
         setScore((prev) => prev + 1);
-
-        toast.success("Perfect 10!", {
-          position: "top-center",
-        });
-      } else {
-        // Show error message if sum is not 10
-        toast.error(`Sum is ${sum}, not 10. Try again!`, {
-          position: "top-center",
-        });
       }
     }
 
@@ -559,12 +548,12 @@ const GameCanvas: React.FC = () => {
           <div className="absolute inset-0 flex flex-col items-center justify-center bg-black bg-opacity-50 rounded-lg backdrop-blur-sm">
             <div className="bg-white p-8 rounded-xl shadow-xl text-center w-[80%] max-w-sm transform transition-all animate-scale-in">
               <h2 className="text-2xl font-bold mb-4 text-apple-red">
-                {!gameStarted ? "Apple Sum Game" : "Game Over!"}
+                {!gameStarted ? "사과 게임" : "게임 종료!"}
               </h2>
 
               {gameOver && (
                 <div className="mb-6">
-                  <p className="text-lg font-medium mb-2">Your Score</p>
+                  <p className="text-lg font-medium mb-2">점수는?</p>
                   <p className="text-4xl font-bold text-apple-red mb-4">
                     {score}
                   </p>
@@ -572,16 +561,24 @@ const GameCanvas: React.FC = () => {
               )}
 
               <p className="text-gray-600 mb-6">
-                {!gameStarted
-                  ? "Drag to select apples that sum to 10. You have 30 seconds!"
-                  : "Time's up! Want to play again?"}
+                {!gameStarted ? (
+                  <>
+                    <p>사과들을 드래그해 10을 만들어 제거할 수 있어요.</p>
+                    <p>{GAME_TIME}초 안에 모든 사과를 제거해보세요!</p>
+                  </>
+                ) : (
+                  <>
+                    <p>시간이 종료되었어요!</p>
+                    <p>게임 결과는 랭킹에 반영될꺼에요!</p>
+                  </>
+                )}
               </p>
 
               <button
                 onClick={!gameStarted ? startGame : resetGame}
                 className="px-8 py-3 bg-apple-red text-white rounded-full font-medium transition-transform transform hover:scale-105 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-apple-red"
               >
-                {!gameStarted ? "Start Game" : "Play Again"}
+                {!gameStarted ? "게임시작" : "다시하기"}
               </button>
             </div>
           </div>
@@ -590,34 +587,27 @@ const GameCanvas: React.FC = () => {
 
       {/* Game information */}
       {gameStarted && !gameOver && (
-        <div className="flex justify-between items-center w-full mb-6 px-4 py-3 bg-white rounded-lg shadow">
+        <div className="w-[540px] flex justify-between items-center mb-6 px-4">
           <div className="flex items-center">
-            <div className="w-12 h-12 bg-apple-red rounded-full flex items-center justify-center text-white">
-              <span className="font-bold text-xl">{score}</span>
-            </div>
-            <span className="ml-2 text-gray-600 font-medium">Score</span>
+            <span className="ml-2 text-gray-600 font-medium">내 점수는</span>
+            <span className="font-bold text-xl ml-2 text-apple-red">
+              {score}
+            </span>
+            <span className="ml-2 text-gray-600 font-medium">점</span>
           </div>
 
           <div className="flex items-center">
             <div
-              className={`w-12 h-12 rounded-full flex items-center justify-center text-white ${
-                timeLeft <= 10 ? "bg-red-500 animate-pulse" : "bg-apple-gray"
+              className={`text-apple-red ${
+                timeLeft <= 10 ? "animate-pulse" : undefined
               }`}
             >
               <span className="font-bold text-xl">{timeLeft}</span>
             </div>
-            <span className="ml-2 text-gray-600 font-medium">Seconds</span>
+            <span className="ml-2 text-gray-600 font-medium">초 남았어요!</span>
           </div>
         </div>
       )}
-
-      {/* Game instructions */}
-      <div className="mt-4 text-center text-gray-600 mx-6">
-        <p className="text-sm">
-          Drag to create rectangles of apples that sum to exactly 10. Clear all
-          apples to win!
-        </p>
-      </div>
     </div>
   );
 };
