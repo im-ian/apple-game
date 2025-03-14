@@ -4,6 +4,14 @@
 
 @custom-variant dark (&:is(.dark *));
 
+@theme {
+  --color-apple-red: #ff2d55;
+  --color-apple-green: #34c759;
+  --color-apple-light: #f9f9fb;
+  --color-apple-dark: #1c1c1e;
+  --color-apple-gray: #8e8e93;
+}
+
 @theme inline {
   --color-background: var(--background);
   --color-foreground: var(--foreground);
