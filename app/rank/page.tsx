@@ -1,6 +1,7 @@
 import { Suspense } from "react";
 import Ranking from "@/components/Ranking";
 import { supabase } from "@/lib/supabase/client";
+import dayjs from "dayjs";
 
 export const revalidate = 30;
 
@@ -18,6 +19,9 @@ export default async function RankPage() {
           🏆 랭킹 TOP 20
         </h1>
 
+        <div className="text-center text-sm text-gray-500 mb-4">
+          마지막 업데이트: {dayjs().format("YYYY-MM-DD HH:mm:ss")}
+        </div>
         <Suspense fallback={<div>Loading...</div>}>
           {data ? (
             <Ranking rankings={data} />
