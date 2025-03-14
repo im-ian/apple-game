@@ -1,5 +1,5 @@
 import React, { useRef, useEffect, useState } from "react";
-
+import { useRouter } from "next/navigation";
 interface Position {
   x: number;
   y: number;
@@ -46,6 +46,8 @@ const GameCanvas: React.FC<{
   const gridSize = 10;
   const cellSize = 50;
   const gridPadding = 20;
+
+  const router = useRouter();
 
   // Initialize game
   useEffect(() => {
@@ -608,6 +610,12 @@ const GameCanvas: React.FC<{
                 className="px-8 py-3 bg-apple-red text-white rounded-full font-medium transition-transform transform hover:scale-105 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-apple-red"
               >
                 {!gameStarted ? "게임시작" : "다시하기"}
+              </button>
+              <button
+                onClick={() => router.push("/rank")}
+                className="px-8 py-3 ml-2 bg-apple-green text-white rounded-full font-medium transition-transform transform hover:scale-105 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-apple-red"
+              >
+                랭킹보기
               </button>
             </div>
           </div>

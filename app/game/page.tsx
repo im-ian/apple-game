@@ -21,7 +21,6 @@ export default function GamePage() {
     <div className="flex flex-col items-center justify-center h-screen">
       <AppleGame
         onGameFinish={(finalScore, score, timeLeft) => {
-          console.log(finalScore, score, timeLeft);
           saveScore(nickname, finalScore, score, timeLeft);
         }}
       />

@@ -1,4 +1,6 @@
-export default function Ranking({ rankings }: { rankings: any[] }) {
+import { Rank } from "@/types/rank";
+
+export default function Ranking({ rankings }: { rankings: Rank[] }) {
   return (
     <div className="bg-white rounded-lg shadow-md overflow-hidden">
       <table className="w-full">

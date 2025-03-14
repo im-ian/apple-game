@@ -2,13 +2,6 @@ import { Suspense } from "react";
 import Ranking from "@/components/Ranking";
 import { supabase } from "@/lib/supabase/client";
 
-interface RankingData {
-  id: number;
-  nickname: string;
-  score: number;
-  created_at: string;
-}
-
 export const revalidate = 30;
 
 export default async function RankPage() {
